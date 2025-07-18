@@ -9,6 +9,45 @@ export default defineConfig((config) => {
   return {
     build: {
       target: 'esnext',
+      // Performance optimizations
+      rollupOptions: {
+        output: {
+          // Manual chunks for better caching and loading patterns
+          manualChunks: {
+            // Core vendor chunks
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-remix': ['@remix-run/react', '@remix-run/cloudflare'],
+            
+            // UI library chunks  
+            'vendor-ui': ['framer-motion', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', 'react-toastify'],
+            'vendor-editor-core': ['@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/autocomplete'],
+            
+            // Terminal and workbench (lazy loaded)
+            'terminal': ['@xterm/xterm', '@xterm/addon-fit', '@xterm/addon-web-links'],
+            'webcontainer': ['@webcontainer/api'],
+            
+            // Language support chunks (will be further optimized with dynamic imports)
+            'lang-web': ['@codemirror/lang-html', '@codemirror/lang-css', '@codemirror/lang-javascript'],
+            'lang-systems': ['@codemirror/lang-python', '@codemirror/lang-cpp'],
+            'lang-markup': ['@codemirror/lang-markdown', '@codemirror/lang-json'],
+            
+            // Syntax highlighting (heavy chunk)
+            'syntax-highlighting': ['shiki'],
+            
+            // Utility libraries
+            'utils': ['nanostores', '@nanostores/react', 'date-fns', 'diff'],
+          },
+          // Better chunk naming for debugging
+          chunkFileNames: (chunkInfo) => {
+            const name = chunkInfo.name;
+            return `[name]-[hash].js`;
+          },
+        },
+      },
+      // Increase chunk size warning limit since we're optimizing manually
+      chunkSizeWarningLimit: 1000,
+      // Better source maps for production debugging
+      sourcemap: config.mode === 'development',
     },
     plugins: [
       nodePolyfills({
@@ -20,6 +59,9 @@ export default defineConfig((config) => {
           v3_fetcherPersist: true,
           v3_relativeSplatPath: true,
           v3_throwAbortReason: true,
+          // Enable performance-oriented future flags
+          v3_lazyRouteDiscovery: true,
+          v3_singleFetch: true,
         },
       }),
       UnoCSS(),
@@ -27,6 +69,29 @@ export default defineConfig((config) => {
       chrome129IssuePlugin(),
       config.mode === 'production' && optimizeCssModules({ apply: 'build' }),
     ],
+    // Optimization hints
+    optimizeDeps: {
+      // Pre-bundle these for faster dev startup
+      include: [
+        'react',
+        'react-dom',
+        '@remix-run/react',
+        'nanostores',
+        '@nanostores/react',
+      ],
+      // Exclude large libraries that should be lazy loaded
+      exclude: [
+        '@webcontainer/api',
+        '@xterm/xterm',
+        'shiki',
+      ],
+    },
+    // Better tree-shaking
+    esbuild: {
+      treeShaking: true,
+      // Remove console.log in production
+      drop: config.mode === 'production' ? ['console', 'debugger'] : [],
+    },
   };
 });
 
